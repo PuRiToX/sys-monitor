@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from collections import Counter
 
 from rich import box
@@ -8,62 +7,49 @@ from rich.console import Group
 from rich.table import Table
 import psutil
 
+from sys_monitor.core import SampleWindow, format_byte_rate, format_byte_size
+
 
 class NetworkMonitor:
     """Collect and render per-interface network counters and connection states."""
 
     def __init__(self, iface: str | None = None):
         self.iface = iface
-        self._last_snapshot: dict[str, object] | None = None
+        self._samplers: dict[str, SampleWindow] = {}
 
     def collect(self) -> dict:
-        now = time.time()
         pernic = psutil.net_io_counters(pernic=True)
+        interfaces = []
 
-        current_snapshot = {
-            "timestamp": now,
-            "interfaces": {
-                name: {
+        for name, counters in pernic.items():
+            if self.iface and name != self.iface:
+                continue
+
+            sampler = self._samplers.setdefault(name, SampleWindow())
+            sampled = sampler.sample(
+                {
                     "bytes_sent": counters.bytes_sent,
                     "bytes_recv": counters.bytes_recv,
                     "packets_sent": counters.packets_sent,
                     "packets_recv": counters.packets_recv,
+                }
+            )
+
+            deltas = sampled["deltas"]
+            values = sampled["values"]
+            interfaces.append(
+                {
+                    "name": name,
+                    **values,
                     "errin": counters.errin,
                     "errout": counters.errout,
                     "dropin": counters.dropin,
                     "dropout": counters.dropout,
-                }
-                for name, counters in pernic.items()
-                if not self.iface or name == self.iface
-            },
-        }
-
-        elapsed = 0.0
-        if self._last_snapshot:
-            elapsed = max(now - float(self._last_snapshot["timestamp"]), 1e-6)
-
-        interfaces = []
-        for name, counters in current_snapshot["interfaces"].items():
-            previous = None
-            if self._last_snapshot:
-                previous = self._last_snapshot["interfaces"].get(name)
-
-            if previous and elapsed > 0.0:
-                rx_bps = (counters["bytes_recv"] - previous["bytes_recv"]) / elapsed
-                tx_bps = (counters["bytes_sent"] - previous["bytes_sent"]) / elapsed
-                rx_pps = (counters["packets_recv"] - previous["packets_recv"]) / elapsed
-                tx_pps = (counters["packets_sent"] - previous["packets_sent"]) / elapsed
-            else:
-                rx_bps = tx_bps = rx_pps = tx_pps = 0.0
-
-            interfaces.append(
-                {
-                    "name": name,
-                    **counters,
-                    "rx_bps": max(0.0, rx_bps),
-                    "tx_bps": max(0.0, tx_bps),
-                    "rx_pps": max(0.0, rx_pps),
-                    "tx_pps": max(0.0, tx_pps),
+                    "rx_bps": max(0.0, deltas["bytes_recv"]),
+                    "tx_bps": max(0.0, deltas["bytes_sent"]),
+                    "rx_pps": max(0.0, deltas["packets_recv"]),
+                    "tx_pps": max(0.0, deltas["packets_sent"]),
+                    "timestamp_utc": sampled["timestamp_utc"],
                 }
             )
 
@@ -77,17 +63,18 @@ class NetworkMonitor:
             connection_states = {}
             connection_error = str(exc)
 
-        self._last_snapshot = current_snapshot
         return {
             "interfaces": interfaces,
             "connection_states": connection_states,
             "connection_error": connection_error,
             "iface": self.iface,
+            "timestamp_utc": interfaces[0]["timestamp_utc"] if interfaces else None,
         }
 
     def render(self, data: dict) -> Group:
         iface_title = data["iface"] if data["iface"] else "all"
-        interface_table = Table(title=f"Network Interfaces ({iface_title})", box=box.SQUARE)
+        title_suffix = f" @ {data['timestamp_utc']}" if data["timestamp_utc"] else ""
+        interface_table = Table(title=f"Network Interfaces ({iface_title}){title_suffix}", box=box.SQUARE)
         interface_table.add_column("IFACE", style="bold", no_wrap=True)
         interface_table.add_column("RX/s", justify="right")
         interface_table.add_column("TX/s", justify="right")
@@ -102,10 +89,10 @@ class NetworkMonitor:
             for nic in data["interfaces"]:
                 interface_table.add_row(
                     nic["name"],
-                    f"{self._format_bytes(nic['rx_bps'])}/s",
-                    f"{self._format_bytes(nic['tx_bps'])}/s",
-                    self._format_bytes(nic["bytes_recv"]),
-                    self._format_bytes(nic["bytes_sent"]),
+                    format_byte_rate(nic["rx_bps"]),
+                    format_byte_rate(nic["tx_bps"]),
+                    format_byte_size(nic["bytes_recv"]),
+                    format_byte_size(nic["bytes_sent"]),
                     self._format_rate(nic["rx_pps"]),
                     self._format_rate(nic["tx_pps"]),
                     f"{nic['errin']}/{nic['errout']}",
@@ -127,15 +114,6 @@ class NetworkMonitor:
             conn_table.add_row("None", "0")
 
         return Group(interface_table, conn_table)
-
-    @staticmethod
-    def _format_bytes(size: float) -> str:
-        value = float(size)
-        for unit in ["B", "KB", "MB", "GB", "TB", "PB"]:
-            if value < 1024:
-                return f"{value:.1f} {unit}"
-            value /= 1024
-        return f"{value:.1f} EB"
 
     @staticmethod
     def _format_rate(value: float) -> str:

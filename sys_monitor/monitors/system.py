@@ -4,6 +4,8 @@ from rich import box
 from rich.table import Table
 import psutil
 
+from sys_monitor.core import SampleWindow
+
 CPU_WARNING = 50
 CPU_CRITICAL = 80
 RAM_WARNING = 50
@@ -17,6 +19,7 @@ class SystemMonitor:
         self.top_n = top_n
         self.cpu_weight = cpu_weight
         self.ram_weight = ram_weight
+        self._sampler = SampleWindow()
 
     def _get_top_processes(self) -> list[dict]:
         processes = []
@@ -46,19 +49,28 @@ class SystemMonitor:
         return f"{value:.1f}%"
 
     def collect(self) -> dict:
-        return {
-            "cpu_total": psutil.cpu_percent(interval=None),
-            "ram_total": psutil.virtual_memory().percent,
-            "processes": self._get_top_processes(),
-        }
+        sampled = self._sampler.sample(
+            {
+                "cpu_total": psutil.cpu_percent(interval=None),
+                "ram_total": psutil.virtual_memory().percent,
+            }
+        )
+        sampled["processes"] = self._get_top_processes()
+        return sampled
 
     def render(self, data: dict) -> Table:
-        cpu_total = data["cpu_total"]
-        ram_total = data["ram_total"]
+        cpu_total = data["values"]["cpu_total"]
+        ram_total = data["values"]["ram_total"]
+        cpu_delta = data["deltas"]["cpu_total"]
+        ram_delta = data["deltas"]["ram_total"]
         top_procs = data["processes"]
 
         table = Table(
-            title=f"System — CPU {cpu_total:.1f}% | RAM {ram_total:.1f}%",
+            title=(
+                f"System @ {data['timestamp_utc']} — "
+                f"CPU {cpu_total:.1f}% ({cpu_delta:+.2f}%/s) | "
+                f"RAM {ram_total:.1f}% ({ram_delta:+.2f}%/s)"
+            ),
             box=box.SQUARE,
         )
         table.add_column("PID", justify="right", width=6)
