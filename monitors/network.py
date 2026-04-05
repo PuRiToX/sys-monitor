@@ -7,7 +7,7 @@ from rich.console import Group
 from rich.table import Table
 import psutil
 
-from sys_monitor.core import SampleWindow, format_byte_rate, format_byte_size
+from core import SampleWindow, format_byte_rate, format_byte_size
 
 
 class NetworkMonitor:

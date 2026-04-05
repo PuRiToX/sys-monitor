@@ -4,7 +4,7 @@ from rich import box
 from rich.table import Table
 import psutil
 
-from sys_monitor.core import SampleWindow
+from core import SampleWindow
 
 CPU_WARNING = 50
 CPU_CRITICAL = 80

@@ -6,12 +6,12 @@ from typing import Protocol
 
 from rich.live import Live
 
-from sys_monitor.config import parse_args
-from sys_monitor.core.alerts import AlertEngine
-from sys_monitor.core.export import EventExporter
-from sys_monitor.monitors.network import NetworkMonitor
-from sys_monitor.monitors.system import SystemMonitor
-from sys_monitor.ui.table_renderer import render_monitors
+from config import parse_args
+from core.alerts import AlertEngine
+from core.export import EventExporter
+from monitors.network import NetworkMonitor
+from monitors.system import SystemMonitor
+from ui.table_renderer import render_monitors
 
 
 class Monitor(Protocol):
