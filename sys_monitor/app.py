@@ -7,6 +7,8 @@ from typing import Protocol
 from rich.live import Live
 
 from sys_monitor.config import parse_args
+from sys_monitor.core.alerts import AlertEngine
+from sys_monitor.core.export import EventExporter
 from sys_monitor.monitors.network import NetworkMonitor
 from sys_monitor.monitors.system import SystemMonitor
 from sys_monitor.ui.table_renderer import render_monitors
@@ -25,16 +27,28 @@ class MonitorBinding:
 
 
 class MonitorApp:
-    def __init__(self, monitors: list[MonitorBinding], mode: str, refresh_seconds: float, refresh_per_second: int):
+    def __init__(
+        self,
+        monitors: list[MonitorBinding],
+        mode: str,
+        refresh_seconds: float,
+        refresh_per_second: int,
+        alert_engine: AlertEngine,
+        exporter: EventExporter,
+    ):
         self.monitors = monitors
         self.mode = mode
         self.refresh_seconds = refresh_seconds
         self.refresh_per_second = refresh_per_second
+        self.alert_engine = alert_engine
+        self.exporter = exporter
 
     def _frame(self):
         rendered: dict[str, object] = {}
         for binding in self.monitors:
             data = binding.monitor.collect()
+            events = self.alert_engine.evaluate(binding.name, data)
+            self.exporter.export(events)
             rendered[binding.name] = binding.monitor.render(data)
         return render_monitors(rendered, self.mode)
 
@@ -61,6 +75,8 @@ def main() -> None:
         mode=config.mode,
         refresh_seconds=config.refresh_seconds,
         refresh_per_second=config.refresh_per_second,
+        alert_engine=AlertEngine(),
+        exporter=EventExporter(jsonl_path=config.alerts_jsonl, csv_path=config.alerts_csv),
     )
     app.run()
 

@@ -13,7 +13,8 @@ class MonitorConfig:
     refresh_per_second: int = 4
     top_processes: int = 10
     iface: str | None = None
-
+    alerts_jsonl: str | None = None
+    alerts_csv: str | None = None
 
 
 def parse_args() -> MonitorConfig:
@@ -49,6 +50,18 @@ def parse_args() -> MonitorConfig:
         default=None,
         help="Interface name to display in network mode (default: all interfaces).",
     )
+    parser.add_argument(
+        "--alerts-jsonl",
+        type=str,
+        default=None,
+        help="Optional JSONL file path for alert events.",
+    )
+    parser.add_argument(
+        "--alerts-csv",
+        type=str,
+        default=None,
+        help="Optional CSV file path for alert events.",
+    )
     args = parser.parse_args()
 
     return MonitorConfig(
@@ -57,4 +70,6 @@ def parse_args() -> MonitorConfig:
         refresh_per_second=args.refresh_per_second,
         top_processes=args.top_procs,
         iface=args.iface,
+        alerts_jsonl=args.alerts_jsonl,
+        alerts_csv=args.alerts_csv,
     )
