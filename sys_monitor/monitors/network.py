@@ -12,7 +12,8 @@ import psutil
 class NetworkMonitor:
     """Collect and render per-interface network counters and connection states."""
 
-    def __init__(self):
+    def __init__(self, iface: str | None = None):
+        self.iface = iface
         self._last_snapshot: dict[str, object] | None = None
 
     def collect(self) -> dict:
@@ -33,6 +34,7 @@ class NetworkMonitor:
                     "dropout": counters.dropout,
                 }
                 for name, counters in pernic.items()
+                if not self.iface or name == self.iface
             },
         }
 
@@ -80,10 +82,12 @@ class NetworkMonitor:
             "interfaces": interfaces,
             "connection_states": connection_states,
             "connection_error": connection_error,
+            "iface": self.iface,
         }
 
     def render(self, data: dict) -> Group:
-        interface_table = Table(title="Network Interfaces", box=box.SQUARE)
+        iface_title = data["iface"] if data["iface"] else "all"
+        interface_table = Table(title=f"Network Interfaces ({iface_title})", box=box.SQUARE)
         interface_table.add_column("IFACE", style="bold", no_wrap=True)
         interface_table.add_column("RX/s", justify="right")
         interface_table.add_column("TX/s", justify="right")
