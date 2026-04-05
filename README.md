@@ -91,12 +91,10 @@ pip install -r requirements.txt
 
 ## Running the monitor
 
-You can launch either entrypoint:
+Launch from the repository root:
 
 ```bash
-python monitor.py
-# or
-python -m sys_monitor.app
+python app.py
 ```
 
 By default, this runs both monitors (`--mode all`) with:
@@ -146,7 +144,7 @@ By default, this runs both monitors (`--mode all`) with:
 Use `-h` or `--help` to view argparse help text:
 
 ```bash
-python monitor.py --help
+python app.py --help
 ```
 
 ---
@@ -156,25 +154,25 @@ python monitor.py --help
 Run system-only dashboard:
 
 ```bash
-python monitor.py --mode system
+python app.py --mode system
 ```
 
 Run network-only dashboard for one interface:
 
 ```bash
-python monitor.py --mode network --iface eth0
+python app.py --mode network --iface eth0
 ```
 
 Run all monitors faster, with more process rows:
 
 ```bash
-python monitor.py --mode all --refresh 0.5 --refresh-per-second 8 --top-procs 20
+python app.py --mode all --refresh 0.5 --refresh-per-second 8 --top-procs 20
 ```
 
 Export warning/critical alerts to both JSONL and CSV:
 
 ```bash
-python monitor.py --alerts-jsonl ./logs/alerts.jsonl --alerts-csv ./logs/alerts.csv
+python app.py --alerts-jsonl ./logs/alerts.jsonl --alerts-csv ./logs/alerts.csv
 ```
 
 ---
@@ -184,7 +182,7 @@ python monitor.py --alerts-jsonl ./logs/alerts.jsonl --alerts-csv ./logs/alerts.
 - The monitor runs continuously until interrupted (`Ctrl+C`).
 - Timestamps in sampled data and events are UTC-formatted strings.
 - Throughput/rates are estimated from consecutive counter snapshots; first frame deltas start at zero.
-- `monitor.py` is a compatibility launcher that delegates to `sys_monitor.app:main`.
+- The application entrypoint is `app.py` at the repository root.
 
 ---
 
