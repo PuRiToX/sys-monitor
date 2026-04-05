@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Protocol
 
 from rich.live import Live
@@ -17,18 +18,25 @@ class Monitor(Protocol):
     def render(self, data: dict): ...
 
 
+@dataclass
+class MonitorBinding:
+    name: str
+    monitor: Monitor
+
+
 class MonitorApp:
-    def __init__(self, monitors: list[Monitor], refresh_seconds: float, refresh_per_second: int):
+    def __init__(self, monitors: list[MonitorBinding], mode: str, refresh_seconds: float, refresh_per_second: int):
         self.monitors = monitors
+        self.mode = mode
         self.refresh_seconds = refresh_seconds
         self.refresh_per_second = refresh_per_second
 
     def _frame(self):
-        rendered = []
-        for monitor in self.monitors:
-            data = monitor.collect()
-            rendered.append(monitor.render(data))
-        return render_monitors(rendered)
+        rendered: dict[str, object] = {}
+        for binding in self.monitors:
+            data = binding.monitor.collect()
+            rendered[binding.name] = binding.monitor.render(data)
+        return render_monitors(rendered, self.mode)
 
     def run(self) -> None:
         with Live(self._frame(), refresh_per_second=self.refresh_per_second, screen=False) as live:
@@ -37,10 +45,20 @@ class MonitorApp:
                 time.sleep(self.refresh_seconds)
 
 
+def _build_monitors(mode: str, top_processes: int, iface: str | None) -> list[MonitorBinding]:
+    monitors: list[MonitorBinding] = []
+    if mode in {"system", "all"}:
+        monitors.append(MonitorBinding(name="system", monitor=SystemMonitor(top_n=top_processes)))
+    if mode in {"network", "all"}:
+        monitors.append(MonitorBinding(name="network", monitor=NetworkMonitor(iface=iface)))
+    return monitors
+
+
 def main() -> None:
     config = parse_args()
     app = MonitorApp(
-        monitors=[SystemMonitor(top_n=config.top_processes), NetworkMonitor()],
+        monitors=_build_monitors(config.mode, config.top_processes, config.iface),
+        mode=config.mode,
         refresh_seconds=config.refresh_seconds,
         refresh_per_second=config.refresh_per_second,
     )
